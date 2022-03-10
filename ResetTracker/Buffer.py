@@ -1,47 +1,33 @@
 from watchdog.events import FileSystemEventHandler
-from Stats import Stats
-from Achievements import Achievements
+from Records import Records
 from watchdog.observers import Observer
 
 
-
 class Buffer(FileSystemEventHandler):
-    a_observer = None
-    s_observer = None
-    stats = None
-    achievements = None
+    r_observer = None
+    records = None
 
     def __init__(self):
-
-        self.achievements = Achievements()
-        self.stats = Stats(self.achievements)
+        self.records = Records()
 
     def on_created(self, event):
         if not event.is_directory:
             return
 
-        if event.src_path[-5:] == "stats":
-            self.s_observer = Observer()
-            self.s_observer.schedule(self.stats, event.src_path, recursive=False)
-            self.s_observer.start()
-
-        if event.src_path[-12:] == "advancements":
-            self.a_observer = Observer()
-            self.a_observer.schedule(
-                self.achievements,
-                event.src_path,
-                recursive=False,
-            )
-            self.a_observer.start()
+        self.r_observer = Observer()
+        self.r_observer.schedule(
+            self.records,
+            event.src_path,
+            recursive=False,
+        )
+        self.r_observer.start()
 
     def stop(self):
-        if self.s_observer != None:
-            self.s_observer.stop()
-        if self.a_observer != None:
-            self.a_observer.stop()
+        if self.r_observer is not None:
+            self.r_observer.stop()
 
     def getRun(self):
-        if self.stats.getRun()[0] == None:
+        if self.records is not None and self.records.getRun()[0] is None:
             return None
-        if self.achievements != None and self.stats != None:
-            return self.achievements.getRun() + self.stats.getRun()
+        elif self.records is not None:
+            return self.records.getRun()

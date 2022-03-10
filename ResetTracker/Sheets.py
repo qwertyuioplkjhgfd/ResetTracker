@@ -35,7 +35,8 @@ def setup():
             creds_file = open("credentials.json", "r")
             creds = json.load(creds_file)
             creds_file.close()
-            print("Don't forget to share the google sheet with", creds["client_email"])
+            print("Don't forget to share the google sheet with",
+                  creds["client_email"])
             settings["spreadsheet-link"] = input("Link to your Sheet:")
             settings_file = open("settings.json", "w")
             json.dump(settings, settings_file)
@@ -135,7 +136,8 @@ def main():
 
         def update_session():
             cell_list = getConfig()
-            statsSheet.update_cells(cell_list, value_input_option="USER_ENTERED")
+            statsSheet.update_cells(
+                cell_list, value_input_option="USER_ENTERED")
 
         def getConfig(cell_list=True):
             if cell_list:

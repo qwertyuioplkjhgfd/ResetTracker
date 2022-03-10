@@ -2,8 +2,8 @@ from pyasn1.type.univ import Null
 
 
 try:
+    import os
     import traceback
-    import nbt
     import json
     import csv
     import time
@@ -40,40 +40,21 @@ try:
             self.static = settings["filter_static"]
 
         def on_created(self, event):
-            # print("New world created", self.src_path)
-            if self.sessionStart == None:
+            if self.sessionStart is None:
                 self.sessionStart = datetime.now()
 
-            if self.buffer_observer != None:
+            if self.buffer_observer is not None:
                 self.buffer.stop()
                 self.buffer_observer.stop()
-                if self.buffer.stats.getRun()[0] != None:
+                if self.buffer.stats.getRun()[0] is not None:
                     data = (
-                        [str(datetime.now())] + self.buffer.getRun() + [self.getSeed()]
+                        [str(datetime.now())] +
+                        self.buffer.getRun()
                     )
                     # add_data to csv
-
                     h, m, s = data[1].split(":")
                     seconds = int(h) * 3600 + int(m) * 60 + int(s)
                     # print("Seconds", seconds)
-
-                    if seconds > ((data[10] / 20) * self.multiplier) or seconds > (
-                        (data[10] / 20) + self.static
-                    ):
-                        temp = data[1]
-                        data[1] = "0:" + str(
-                            time.strftime("%M:%S", time.gmtime(data[10] / 20))
-                        )
-                        print(
-                            "Reverted playtime of",
-                            temp,
-                            "to",
-                            data[1],
-                            "because difference between igt and rta was too large",
-                        )
-                        data.append("M")
-
-                        # print("Reverted time to be based off of igt")
                     print(data[1:10])
                     with open(statsCsv, "r") as infile:
                         reader = list(csv.reader(infile))
@@ -90,11 +71,12 @@ try:
                 return
 
             self.src_path = event.src_path
-            print("New world created", self.src_path)
+            print("New record created", self.src_path)
 
             self.buffer = Buffer()
             self.buffer_observer = Observer()
-            self.buffer_observer.schedule(self.buffer, self.src_path, recursive=False)
+            self.buffer_observer.schedule(
+                self.buffer, self.src_path, recursive=False)
 
             try:
                 self.buffer_observer.start()
@@ -106,43 +88,28 @@ try:
                 self.buffer.achievements.endTime - self.sessionStart
             ).total_seconds()
 
-        def getSeed(self):
-            try:
-                nbtfile = nbt.NBTFile(self.src_path + "\\level.dat", "rb")
-                seed = nbtfile["Data"]["WorldGenSettings"]["seed"]
-                seed = "'" + str(seed)
-            except:
-                print("Failed to get seed")
-                seed = None
-            return seed
-
     if __name__ == "__main__":
-        if settings["instances"] != len(settings["path"]):
-            settings["instances"] = int(input("How many instances are you using? "))
-            settings["path"] = [None] * settings["instances"]
-            for i in range(settings["instances"]):
-                settings["path"][i] = input(
-                    "Path to saves directory for instance " + str(i + 1) + ": "
-                )
-            settings_file = open("settings.json", "w")
-            json.dump(settings, settings_file)
-            settings_file.close()
+        settings["path"] = input(
+            "Path to SpeedrunIGT records folder: "
+        )
+        settings_file = open("settings.json", "w")
+        json.dump(settings, settings_file)
+        settings_file.close()
 
         while True:
             try:
                 savesObserver = Observer()
-                for dir in settings["path"]:
-                    event_handler = Saves()
-                    savesObserver.schedule(event_handler, dir, recursive=False)
-                    print("tracking: ", dir)
+                event_handler = Saves()
+                savesObserver.schedule(
+                    event_handler, settings["path"], recursive=False)
+                print("tracking: ", settings["path"])
                 savesObserver.start()
                 print("Started")
             except Exception as e:
-                print("One of the saves directories could not be found")
-                for i in range(settings["instances"]):
-                    settings["path"][i] = input(
-                        "Path to saves directory for instance " + str(i + 1) + ": "
-                    )
+                print("Records directory could not be found")
+                settings["path"] = input(
+                    "Path to SpeedrunIGT records folder: "
+                )
                 settings_file = open("settings.json", "w")
                 json.dump(settings, settings_file)
                 settings_file.close()
