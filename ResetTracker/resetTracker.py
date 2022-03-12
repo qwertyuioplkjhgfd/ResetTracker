@@ -35,7 +35,6 @@ class NewRecord(FileSystemEventHandler):
     src_path = None
 
     def __init__(self):
-        self.this_run = [None] * (len(advChecks) + 1 + len(statsChecks))
         self.path = None
         self.data = None
 
@@ -50,9 +49,15 @@ class NewRecord(FileSystemEventHandler):
         return True
 
     def on_created(self, evt):
+        self.this_run = [None] * (len(advChecks) + 1 + len(statsChecks))
         self.path = evt.src_path
         with open(self.path, "r") as record_file:
-            self.data = json.load(record_file)
+            try:
+                self.data = json.load(record_file)
+            except Exception as e:
+                # WP reset
+                # Do something efficient here idk
+                return
         if self.data is None:
             print("Record file couldnt be read")
             return
@@ -61,37 +66,34 @@ class NewRecord(FileSystemEventHandler):
             return
 
         # Ensure there are stats
-        skipStats = len(self.data["stats"].keys()) == 0
-        if not skipStats:
-            uid = list(self.data["stats"].keys())[0]
-            stats = self.data["stats"][uid]["stats"]
+        uid = list(self.data["stats"].keys())[0]
+        stats = self.data["stats"][uid]["stats"]
         adv = self.data["advancements"]
 
         # Advancements
-        self.this_run[0] = ms_to_string(self.data["retimed_igt"])
+        self.this_run[0] = ms_to_string(self.data["final_rta"])
         for idx in range(len(advChecks)):
             # Prefer to read from timelines
             if advChecks[idx][0] == "timelines" and self.this_run[idx + 1] is None:
-                if len(self.data["timelines"]) > advChecks[idx][1]:
-                    self.this_run[idx + 1] = ms_to_string(
-                        self.data["timelines"][advChecks[idx][1]]["igt"])
+                for tl in self.data["timelines"]:
+                    if tl["name"] == advChecks[idx][1]:
+                        self.this_run[idx + 1] = ms_to_string(tl["igt"])
             # Read other stuff from advancements
             elif (advChecks[idx][0] in adv and adv[advChecks[idx][0]]["complete"] and self.this_run[idx + 1] is None):
                 self.this_run[idx +
                               1] = ms_to_string(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["igt"])
 
         # Stats
-        if not skipStats:
-            self.this_run[len(advChecks)] = ms_to_string(
-                self.data["final_igt"])
-            for idx in range(1, len(statsChecks)):
-                if (
-                    statsChecks[idx][0] in stats
-                    and statsChecks[idx][1] in stats[statsChecks[idx][0]]
-                ):
-                    self.this_run[len(advChecks) + idx] = str(
-                        stats[statsChecks[idx][0]][statsChecks[idx][1]]
-                    )
+        self.this_run[len(advChecks) + 1] = ms_to_string(
+            self.data["final_igt"])
+        for idx in range(1, len(statsChecks)):
+            if (
+                statsChecks[idx][0] in stats
+                and statsChecks[idx][1] in stats[statsChecks[idx][0]]
+            ):
+                self.this_run[len(advChecks) + 1 + idx] = str(
+                    stats[statsChecks[idx][0]][statsChecks[idx][1]]
+                )
 
         # Push to csv
         d = datetime.strptime(self.path.split(
