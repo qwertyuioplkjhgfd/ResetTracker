@@ -1,4 +1,5 @@
 {
   "path": "PATH",
-  "spreadsheet-link": "LINK"
+  "spreadsheet-link": "LINK",
+  "delete-old-records": true
 }

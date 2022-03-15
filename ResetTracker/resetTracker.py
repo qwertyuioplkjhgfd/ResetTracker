@@ -1,6 +1,8 @@
 import time
 import json
 import csv
+import glob
+import os
 from datetime import datetime, timedelta
 import threading
 from Sheets import main, setup
@@ -21,10 +23,12 @@ except Exception as e:
     wait = input("")
 
 
-def ms_to_string(ms):
+def ms_to_string(ms, returnTime=False):
     ms = int(ms)
-    time = datetime(1970, 1, 1) + timedelta(milliseconds=ms)
-    return time.strftime("%H:%M:%S")
+    t = datetime(1970, 1, 1) + timedelta(milliseconds=ms)
+    if returnTime:
+        return t
+    return t.strftime("%H:%M:%S")
 
 
 class NewRecord(FileSystemEventHandler):
@@ -104,8 +108,7 @@ class NewRecord(FileSystemEventHandler):
                 )
 
         # Push to csv
-        d = datetime.strptime(self.path.split(
-            ".")[0].split("\\")[-1], "%y-%m-%d-%H-%M-%S")
+        d = ms_to_string(int(self.data["date"]), returnTime=True)
         data = ([str(d)] + self.this_run + [str(self.reset_count)])
 
         with open(statsCsv, "r") as infile:
@@ -143,6 +146,10 @@ if __name__ == "__main__":
             settings_file.close()
         else:
             break
+    if settings["delete-old-records"]:
+        files = glob.glob(f'{settings["path"]}\\*.json')
+        for f in files:
+            os.remove(f)
     setup()
     t = threading.Thread(
         target=main, name="sheets"
