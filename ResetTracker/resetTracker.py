@@ -33,6 +33,7 @@ class NewRecord(FileSystemEventHandler):
     buffer_observer = None
     prev = None
     src_path = None
+    reset_count = 0
 
     def __init__(self):
         self.path = None
@@ -49,14 +50,14 @@ class NewRecord(FileSystemEventHandler):
         return True
 
     def on_created(self, evt):
+        self.reset_count += 1
         self.this_run = [None] * (len(advChecks) + 1 + len(statsChecks))
         self.path = evt.src_path
         with open(self.path, "r") as record_file:
             try:
                 self.data = json.load(record_file)
             except Exception as e:
-                # WP reset
-                # Do something efficient here idk
+                # skip
                 return
         if self.data is None:
             print("Record file couldnt be read")
@@ -72,16 +73,23 @@ class NewRecord(FileSystemEventHandler):
 
         # Advancements
         self.this_run[0] = ms_to_string(self.data["final_rta"])
+        has_done_anything = False
         for idx in range(len(advChecks)):
             # Prefer to read from timelines
             if advChecks[idx][0] == "timelines" and self.this_run[idx + 1] is None:
                 for tl in self.data["timelines"]:
                     if tl["name"] == advChecks[idx][1]:
                         self.this_run[idx + 1] = ms_to_string(tl["igt"])
+                        has_done_anything = True
             # Read other stuff from advancements
             elif (advChecks[idx][0] in adv and adv[advChecks[idx][0]]["complete"] and self.this_run[idx + 1] is None):
                 self.this_run[idx +
                               1] = ms_to_string(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["igt"])
+                has_done_anything = True
+
+        # If nothing was done, just count as reset
+        if not has_done_anything:
+            return
 
         # Stats
         self.this_run[len(advChecks) + 1] = ms_to_string(
@@ -98,7 +106,7 @@ class NewRecord(FileSystemEventHandler):
         # Push to csv
         d = datetime.strptime(self.path.split(
             ".")[0].split("\\")[-1], "%y-%m-%d-%H-%M-%S")
-        data = ([str(d)] + self.this_run)
+        data = ([str(d)] + self.this_run + [str(self.reset_count)])
 
         with open(statsCsv, "r") as infile:
             reader = list(csv.reader(infile))
@@ -108,6 +116,7 @@ class NewRecord(FileSystemEventHandler):
             writer = csv.writer(outfile)
             for line in reader:
                 writer.writerow(line)
+        self.reset_count = 0
 
 
 if __name__ == "__main__":
