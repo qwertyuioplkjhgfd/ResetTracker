@@ -89,7 +89,7 @@ class NewRecord(FileSystemEventHandler):
                               1] = ms_to_string(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["igt"])
 
         # If nothing was done, just count as reset
-        if self.data["final_rta"] == 0:
+        if self.data["final_rta"] < 1000:
             return
 
         # Stats
