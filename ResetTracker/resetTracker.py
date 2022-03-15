@@ -38,6 +38,7 @@ class NewRecord(FileSystemEventHandler):
     prev = None
     src_path = None
     reset_count = 0
+    rta_spent = 0
 
     def __init__(self):
         self.path = None
@@ -70,12 +71,13 @@ class NewRecord(FileSystemEventHandler):
             print("Run failed validation")
             return
 
-        # Ensure there are stats
+        self.rta_spent += self.data["final_rta"]
         uid = list(self.data["stats"].keys())[0]
         stats = self.data["stats"][uid]["stats"]
         adv = self.data["advancements"]
 
         # Advancements
+        has_done_something = False
         self.this_run[0] = ms_to_string(self.data["final_rta"])
         for idx in range(len(advChecks)):
             # Prefer to read from timelines
@@ -83,13 +85,15 @@ class NewRecord(FileSystemEventHandler):
                 for tl in self.data["timelines"]:
                     if tl["name"] == advChecks[idx][1]:
                         self.this_run[idx + 1] = ms_to_string(tl["igt"])
+                        has_done_something = True
             # Read other stuff from advancements
             elif (advChecks[idx][0] in adv and adv[advChecks[idx][0]]["complete"] and self.this_run[idx + 1] is None):
                 self.this_run[idx +
                               1] = ms_to_string(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["igt"])
+                has_done_something = True
 
         # If nothing was done, just count as reset
-        if self.data["final_rta"] < 1000:
+        if not has_done_something:
             return
 
         # Stats
@@ -106,7 +110,8 @@ class NewRecord(FileSystemEventHandler):
 
         # Push to csv
         d = ms_to_string(int(self.data["date"]), returnTime=True)
-        data = ([str(d)] + self.this_run + [str(self.reset_count)])
+        data = ([str(d)] + self.this_run +
+                [str(self.reset_count), ms_to_string(self.rta_spent)])
 
         with open(statsCsv, "r") as infile:
             reader = list(csv.reader(infile))
@@ -117,6 +122,7 @@ class NewRecord(FileSystemEventHandler):
             for line in reader:
                 writer.writerow(line)
         self.reset_count = 0
+        self.rta_spent = 0
 
 
 if __name__ == "__main__":
