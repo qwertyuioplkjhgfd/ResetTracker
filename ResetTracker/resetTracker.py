@@ -77,22 +77,19 @@ class NewRecord(FileSystemEventHandler):
 
         # Advancements
         self.this_run[0] = ms_to_string(self.data["final_rta"])
-        has_done_anything = False
         for idx in range(len(advChecks)):
             # Prefer to read from timelines
             if advChecks[idx][0] == "timelines" and self.this_run[idx + 1] is None:
                 for tl in self.data["timelines"]:
                     if tl["name"] == advChecks[idx][1]:
                         self.this_run[idx + 1] = ms_to_string(tl["igt"])
-                        has_done_anything = True
             # Read other stuff from advancements
             elif (advChecks[idx][0] in adv and adv[advChecks[idx][0]]["complete"] and self.this_run[idx + 1] is None):
                 self.this_run[idx +
                               1] = ms_to_string(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["igt"])
-                has_done_anything = True
 
         # If nothing was done, just count as reset
-        if not has_done_anything:
+        if self.data["final_rta"] == 0:
             return
 
         # Stats
