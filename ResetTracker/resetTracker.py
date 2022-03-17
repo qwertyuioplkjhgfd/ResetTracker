@@ -72,8 +72,10 @@ class NewRecord(FileSystemEventHandler):
             return
 
         self.rta_spent += self.data["final_rta"]
-        uid = list(self.data["stats"].keys())[0]
-        stats = self.data["stats"][uid]["stats"]
+        uids = list(self.data["stats"].keys())
+        if len(uids) == 0:
+            return
+        stats = self.data["stats"][uids[0]]["stats"]
         adv = self.data["advancements"]
 
         # Advancements
