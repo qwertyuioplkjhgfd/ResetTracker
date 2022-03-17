@@ -72,6 +72,8 @@ class NewRecord(FileSystemEventHandler):
             return
 
         self.rta_spent += self.data["final_rta"]
+        if self.data["final_rta"] == 0:
+            return
         uids = list(self.data["stats"].keys())
         if len(uids) == 0:
             return
