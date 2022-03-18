@@ -39,6 +39,7 @@ class NewRecord(FileSystemEventHandler):
     src_path = None
     reset_count = 0
     rta_spent = 0
+    splitless_count = 0
 
     def __init__(self):
         self.path = None
@@ -56,7 +57,7 @@ class NewRecord(FileSystemEventHandler):
 
     def on_created(self, evt):
         self.reset_count += 1
-        self.this_run = [None] * (len(advChecks) + 1 + len(statsChecks))
+        self.this_run = [None] * (len(advChecks) + 2 + len(statsChecks) + 3)
         self.path = evt.src_path
         with open(self.path, "r") as record_file:
             try:
@@ -98,24 +99,28 @@ class NewRecord(FileSystemEventHandler):
 
         # If nothing was done, just count as reset
         if not has_done_something:
+            # From earlier we know that final_rta > 0 so this is a splitless non-wall/bg reset
+            self.splitless_count += 1
             return
 
         # Stats
         self.this_run[len(advChecks) + 1] = ms_to_string(
             self.data["final_igt"])
+        self.this_run[len(advChecks) + 2] = ms_to_string(
+            self.data["retimed_igt"])
         for idx in range(1, len(statsChecks)):
             if (
                 statsChecks[idx][0] in stats
                 and statsChecks[idx][1] in stats[statsChecks[idx][0]]
             ):
-                self.this_run[len(advChecks) + 1 + idx] = str(
+                self.this_run[len(advChecks) + 2 + idx] = str(
                     stats[statsChecks[idx][0]][statsChecks[idx][1]]
                 )
 
         # Push to csv
         d = ms_to_string(int(self.data["date"]), returnTime=True)
         data = ([str(d)] + self.this_run +
-                [str(self.reset_count), ms_to_string(self.rta_spent)])
+                [str(self.reset_count), ms_to_string(self.rta_spent), str(self.splitless_count)])
 
         with open(statsCsv, "r") as infile:
             reader = list(csv.reader(infile))
@@ -127,6 +132,7 @@ class NewRecord(FileSystemEventHandler):
                 writer.writerow(line)
         self.reset_count = 0
         self.rta_spent = 0
+        self.splitless_count = 0
 
 
 if __name__ == "__main__":
