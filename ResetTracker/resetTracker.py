@@ -37,9 +37,11 @@ class NewRecord(FileSystemEventHandler):
     buffer_observer = None
     prev = None
     src_path = None
+    prev_datetime = None
     reset_count = 0
     rta_spent = 0
     splitless_count = 0
+    break_rta = 0
 
     def __init__(self):
         self.path = None
@@ -57,7 +59,7 @@ class NewRecord(FileSystemEventHandler):
 
     def on_created(self, evt):
         self.reset_count += 1
-        self.this_run = [None] * (len(advChecks) + 2 + len(statsChecks) + 3)
+        self.this_run = [None] * (len(advChecks) + 2 + len(statsChecks))
         self.path = evt.src_path
         with open(self.path, "r") as record_file:
             try:
@@ -71,6 +73,18 @@ class NewRecord(FileSystemEventHandler):
         if not self.ensure_run():
             print("Run failed validation")
             return
+
+        # Calculate breaks
+        if self.prev_datetime is not None:
+            run_offset = self.prev_datetime + \
+                timedelta(milliseconds=self.data["final_rta"]) + \
+                timedelta(seconds=settings["break-offset"])
+            self.prev_datetime = datetime.now()
+            if (self.prev_datetime - run_offset).total_seconds() > 0:
+                self.break_rta += (self.prev_datetime -
+                                   run_offset).total_seconds() * 1000
+        else:
+            self.prev_datetime = datetime.now()
 
         self.rta_spent += self.data["final_rta"]
         if self.data["final_rta"] == 0:
@@ -120,7 +134,8 @@ class NewRecord(FileSystemEventHandler):
         # Push to csv
         d = ms_to_string(int(self.data["date"]), returnTime=True)
         data = ([str(d)] + self.this_run +
-                [str(self.reset_count), ms_to_string(self.rta_spent), str(self.splitless_count)])
+                [str(self.reset_count), ms_to_string(self.rta_spent),
+                 str(self.splitless_count), ms_to_string(self.break_rta)])
 
         with open(statsCsv, "r") as infile:
             reader = list(csv.reader(infile))
@@ -130,9 +145,11 @@ class NewRecord(FileSystemEventHandler):
             writer = csv.writer(outfile)
             for line in reader:
                 writer.writerow(line)
+        # Reset all counters/sums
         self.reset_count = 0
         self.rta_spent = 0
         self.splitless_count = 0
+        self.break_rta = 0
 
 
 if __name__ == "__main__":
