@@ -77,12 +77,11 @@ class NewRecord(FileSystemEventHandler):
         # Calculate breaks
         if self.prev_datetime is not None:
             run_offset = self.prev_datetime + \
-                timedelta(milliseconds=self.data["final_rta"]) + \
-                timedelta(seconds=settings["break-offset"])
+                timedelta(milliseconds=self.data["final_rta"])
             self.prev_datetime = datetime.now()
-            if (self.prev_datetime - run_offset).total_seconds() > 0:
-                self.break_rta += (self.prev_datetime -
-                                   run_offset).total_seconds() * 1000
+            run_differ = self.prev_datetime - run_offset
+            if run_differ > timedelta(seconds=settings["break-offset"]):
+                self.break_rta += run_differ.total_seconds() * 1000
         else:
             self.prev_datetime = datetime.now()
 
