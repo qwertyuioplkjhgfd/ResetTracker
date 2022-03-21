@@ -38,7 +38,7 @@ class NewRecord(FileSystemEventHandler):
     prev = None
     src_path = None
     prev_datetime = None
-    reset_count = 0
+    wall_resets = 0
     rta_spent = 0
     splitless_count = 0
     break_rta = 0
@@ -58,7 +58,6 @@ class NewRecord(FileSystemEventHandler):
         return True
 
     def on_created(self, evt):
-        self.reset_count += 1
         self.this_run = [None] * (len(advChecks) + 2 + len(statsChecks))
         self.path = evt.src_path
         with open(self.path, "r") as record_file:
@@ -85,8 +84,8 @@ class NewRecord(FileSystemEventHandler):
         else:
             self.prev_datetime = datetime.now()
 
-        self.rta_spent += self.data["final_rta"]
         if self.data["final_rta"] == 0:
+            self.wall_resets += 1
             return
         uids = list(self.data["stats"].keys())
         if len(uids) == 0:
@@ -114,6 +113,8 @@ class NewRecord(FileSystemEventHandler):
         if not has_done_something:
             # From earlier we know that final_rta > 0 so this is a splitless non-wall/bg reset
             self.splitless_count += 1
+            # Only account for splitless RTA
+            self.rta_spent += self.data["final_rta"]
             return
 
         # Stats
@@ -133,8 +134,8 @@ class NewRecord(FileSystemEventHandler):
         # Push to csv
         d = ms_to_string(int(self.data["date"]), returnTime=True)
         data = ([str(d)] + self.this_run +
-                [str(self.reset_count), ms_to_string(self.rta_spent),
-                 str(self.splitless_count), ms_to_string(self.break_rta)])
+                [str(self.wall_resets), str(self.splitless_count),
+                 ms_to_string(self.rta_spent), ms_to_string(self.break_rta)])
 
         with open(statsCsv, "r") as infile:
             reader = list(csv.reader(infile))
@@ -145,7 +146,7 @@ class NewRecord(FileSystemEventHandler):
             for line in reader:
                 writer.writerow(line)
         # Reset all counters/sums
-        self.reset_count = 0
+        self.wall_resets = 0
         self.rta_spent = 0
         self.splitless_count = 0
         self.break_rta = 0
