@@ -104,14 +104,14 @@ class NewRecord(FileSystemEventHandler):
             if advChecks[idx][0] == "timelines" and self.this_run[idx + 1] is None:
                 for tl in self.data["timelines"]:
                     if tl["name"] == advChecks[idx][1]:
-                        if lan > tl["igt"]:
+                        if lan > int(tl["igt"]):
                             self.this_run[idx + 1] = ms_to_string(tl["igt"])
                             has_done_something = True
             # Read other stuff from advancements
             elif (advChecks[idx][0] in adv and adv[advChecks[idx][0]]["complete"] and self.this_run[idx + 1] is None):
                 igt = adv[advChecks[idx][0]
                           ]["criteria"][advChecks[idx][1]]["igt"]
-                if lan > igt:
+                if lan > int(igt):
                     self.this_run[idx +
                                   1] = ms_to_string(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["igt"])
                     has_done_something = True
