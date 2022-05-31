@@ -1,4 +1,5 @@
 import time
+import math
 import json
 import csv
 import glob
@@ -92,6 +93,7 @@ class NewRecord(FileSystemEventHandler):
             return
         stats = self.data["stats"][uids[0]]["stats"]
         adv = self.data["advancements"]
+        lan = self.data["open_lan"]
 
         # Advancements
         has_done_something = False
@@ -131,9 +133,48 @@ class NewRecord(FileSystemEventHandler):
                     stats[statsChecks[idx][0]][statsChecks[idx][1]]
                 )
 
+        # Generate other stuff
+        if "minecraft:story/smelt_iron" in adv or "minecraft:story/iron_tools" in adv or (
+                "minecraft:crafted" in stats and "minecraft:diamond_pickaxe" in stats["minecraft:crafted"]):
+            iron_source = "Structureless"
+            # If mined haybale or killed golem then village
+            if ("minecraft:mined" in stats and "minecraft:hay_block" in stats["minecraft:mined"]) or (
+                    "minecraft:killed" in stats and "minecraft:iron_golem" in stats["minecraft:killed"]):
+                iron_source = "Village"
+            elif "minecraft:used" in stats and ("minecraft:cooked_salmon" in stats["minecraft:used"] or "minecraft:cooked_cod" in stats["minecraft:used"]):
+                iron_source = "Buried Treasure"
+            elif "minecraft:adventure/adventuring_time" in adv:
+                for biome in adv["minecraft:adventure/adventuring_time"]["criteria"]:
+                    # If youre in an ocean before 3m
+                    if "ocean" in biome and int(adv["minecraft:adventure/adventuring_time"]["criteria"][biome]["igt"]) < 180000:
+                        iron_source = "Ship/BT"
+                        break
+        else:
+            iron_source = "None"
+
+        if "minecraft:story/enter_the_nether" in adv:
+            enter_type = "Obsidian"
+            if "minecraft:mined" in stats and "minecraft:magma_block" in stats["minecraft:mined"]:
+                enter_type = "Magma Ravine"
+            elif "minecraft:story/lava_bucket" in adv:
+                enter_type = "Lava Pool"
+        else:
+            enter_type = "None"
+
+        if ("minecraft:dropped" in stats and "minecraft:gold_ingot" in stats["minecraft:dropped"]) or (
+            "minecraft:picked_up" in stats and (
+                "minecraft:gold_ingot" in stats["minecraft:picked_up"] or "minecraft:gold_block" in stats["minecraft:picked_up"])):
+            gold_source = "Classic"
+            if "minecraft:mined" in stats and "minecraft:dark_prismarine" in stats["minecraft:mined"]:
+                gold_source = "Monument"
+            elif "minecraft:nether/find_bastion" in adv:
+                gold_source = "Bastion"
+        else:
+            gold_source = "None"
+
         # Push to csv
         d = ms_to_string(int(self.data["date"]), returnTime=True)
-        data = ([str(d)] + self.this_run +
+        data = ([str(d), iron_source, enter_type, gold_source] + self.this_run +
                 [str(self.wall_resets), str(self.splitless_count),
                  ms_to_string(self.rta_spent), ms_to_string(self.break_rta)])
 
