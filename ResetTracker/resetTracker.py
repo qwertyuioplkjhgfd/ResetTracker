@@ -1,5 +1,4 @@
 import time
-import math
 import json
 import csv
 import glob
@@ -94,6 +93,8 @@ class NewRecord(FileSystemEventHandler):
         stats = self.data["stats"][uids[0]]["stats"]
         adv = self.data["advancements"]
         lan = self.data["open_lan"]
+        if lan is not None:
+            lan = int(lan)
 
         # Advancements
         has_done_something = False
@@ -103,13 +104,17 @@ class NewRecord(FileSystemEventHandler):
             if advChecks[idx][0] == "timelines" and self.this_run[idx + 1] is None:
                 for tl in self.data["timelines"]:
                     if tl["name"] == advChecks[idx][1]:
-                        self.this_run[idx + 1] = ms_to_string(tl["igt"])
-                        has_done_something = True
+                        if lan > tl["igt"]:
+                            self.this_run[idx + 1] = ms_to_string(tl["igt"])
+                            has_done_something = True
             # Read other stuff from advancements
             elif (advChecks[idx][0] in adv and adv[advChecks[idx][0]]["complete"] and self.this_run[idx + 1] is None):
-                self.this_run[idx +
-                              1] = ms_to_string(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["igt"])
-                has_done_something = True
+                igt = adv[advChecks[idx][0]
+                          ]["criteria"][advChecks[idx][1]]["igt"]
+                if lan > igt:
+                    self.this_run[idx +
+                                  1] = ms_to_string(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["igt"])
+                    has_done_something = True
 
         # If nothing was done, just count as reset
         if not has_done_something:
@@ -134,6 +139,7 @@ class NewRecord(FileSystemEventHandler):
                 )
 
         # Generate other stuff
+        iron_source = "None"
         if "minecraft:story/smelt_iron" in adv or "minecraft:story/iron_tools" in adv or (
                 "minecraft:crafted" in stats and "minecraft:diamond_pickaxe" in stats["minecraft:crafted"]):
             iron_source = "Structureless"
@@ -149,18 +155,16 @@ class NewRecord(FileSystemEventHandler):
                     if "ocean" in biome and int(adv["minecraft:adventure/adventuring_time"]["criteria"][biome]["igt"]) < 180000:
                         iron_source = "Ship/BT"
                         break
-        else:
-            iron_source = "None"
 
+        enter_type = "None"
         if "minecraft:story/enter_the_nether" in adv:
             enter_type = "Obsidian"
             if "minecraft:mined" in stats and "minecraft:magma_block" in stats["minecraft:mined"]:
                 enter_type = "Magma Ravine"
             elif "minecraft:story/lava_bucket" in adv:
                 enter_type = "Lava Pool"
-        else:
-            enter_type = "None"
 
+        gold_source = "None"
         if ("minecraft:dropped" in stats and "minecraft:gold_ingot" in stats["minecraft:dropped"]) or (
             "minecraft:picked_up" in stats and (
                 "minecraft:gold_ingot" in stats["minecraft:picked_up"] or "minecraft:gold_block" in stats["minecraft:picked_up"])):
@@ -169,12 +173,16 @@ class NewRecord(FileSystemEventHandler):
                 gold_source = "Monument"
             elif "minecraft:nether/find_bastion" in adv:
                 gold_source = "Bastion"
-        else:
-            gold_source = "None"
+
+        spawn_biome = "None"
+        if "minecraft:adventure/adventuring_time" in adv:
+            for biome in adv["minecraft:adventure/adventuring_time"]["criteria"]:
+                if adv["minecraft:adventure/adventuring_time"]["criteria"][biome][igt] == 0:
+                    spawn_biome = biome
 
         # Push to csv
         d = ms_to_string(int(self.data["date"]), returnTime=True)
-        data = ([str(d), iron_source, enter_type, gold_source] + self.this_run +
+        data = ([str(d), iron_source, enter_type, gold_source, spawn_biome] + self.this_run +
                 [str(self.wall_resets), str(self.splitless_count),
                  ms_to_string(self.rta_spent), ms_to_string(self.break_rta)])
 
