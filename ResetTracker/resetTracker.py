@@ -1,5 +1,6 @@
 import time
 import json
+import math
 import csv
 import glob
 import os
@@ -24,6 +25,8 @@ except Exception as e:
 
 
 def ms_to_string(ms, returnTime=False):
+    if ms is None:
+        return None
     ms = int(ms)
     t = datetime(1970, 1, 1) + timedelta(milliseconds=ms)
     if returnTime:
@@ -95,6 +98,8 @@ class NewRecord(FileSystemEventHandler):
         lan = self.data["open_lan"]
         if lan is not None:
             lan = int(lan)
+        else:
+            lan = math.inf
 
         # Advancements
         has_done_something = False
@@ -104,14 +109,12 @@ class NewRecord(FileSystemEventHandler):
             if advChecks[idx][0] == "timelines" and self.this_run[idx + 1] is None:
                 for tl in self.data["timelines"]:
                     if tl["name"] == advChecks[idx][1]:
-                        if lan > int(tl["igt"]):
+                        if lan > int(tl["rta"]):
                             self.this_run[idx + 1] = ms_to_string(tl["igt"])
                             has_done_something = True
             # Read other stuff from advancements
             elif (advChecks[idx][0] in adv and adv[advChecks[idx][0]]["complete"] and self.this_run[idx + 1] is None):
-                igt = adv[advChecks[idx][0]
-                          ]["criteria"][advChecks[idx][1]]["igt"]
-                if lan > int(igt):
+                if lan > int(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["rta"]):
                     self.this_run[idx +
                                   1] = ms_to_string(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["igt"])
                     has_done_something = True
@@ -160,7 +163,10 @@ class NewRecord(FileSystemEventHandler):
         if "minecraft:story/enter_the_nether" in adv:
             enter_type = "Obsidian"
             if "minecraft:mined" in stats and "minecraft:magma_block" in stats["minecraft:mined"]:
-                enter_type = "Magma Ravine"
+                if "minecraft:story/lava_bucket" in adv:
+                    enter_type = "Magma Ravine"
+                else:
+                    enter_type = "Bucketless"
             elif "minecraft:story/lava_bucket" in adv:
                 enter_type = "Lava Pool"
 
@@ -177,13 +183,15 @@ class NewRecord(FileSystemEventHandler):
         spawn_biome = "None"
         if "minecraft:adventure/adventuring_time" in adv:
             for biome in adv["minecraft:adventure/adventuring_time"]["criteria"]:
-                if adv["minecraft:adventure/adventuring_time"]["criteria"][biome][igt] == 0:
-                    spawn_biome = biome
+                if adv["minecraft:adventure/adventuring_time"]["criteria"][biome]["igt"] == 0:
+                    spawn_biome = biome.split(":")[1]
+
+        iron_time = adv["minecraft:story/smelt_iron"]["igt"] if "minecraft:story/smelt_iron" in adv else None
 
         # Push to csv
         d = ms_to_string(int(self.data["date"]), returnTime=True)
         data = ([str(d), iron_source, enter_type, gold_source, spawn_biome] + self.this_run +
-                [str(self.wall_resets), str(self.splitless_count),
+                [ms_to_string(iron_time), str(self.wall_resets), str(self.splitless_count),
                  ms_to_string(self.rta_spent), ms_to_string(self.break_rta)])
 
         with open(statsCsv, "r") as infile:
