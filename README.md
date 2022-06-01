@@ -8,7 +8,7 @@ Use the [new stats sheet](https://docs.google.com/spreadsheets/d/1o6nSdJOJOLXqFk
 
 ## Required Mods:
 - Atum 1.0.5+
-- SpeedrunIGT 9.0 (10.x is broken for this)
+- SpeedrunIGT 10.7+
 
 ## To add in future:
 - Version-specific stats
