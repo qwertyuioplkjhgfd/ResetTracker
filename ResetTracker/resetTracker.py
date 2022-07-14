@@ -52,12 +52,11 @@ class NewRecord(FileSystemEventHandler):
 
     def ensure_run(self):
         if self.path is None:
-            return False
+            return False, "Path error"
         if self.data is None:
-            return False
-        # Ensure its not a set seed
-        if "RandomSpeedrun #" not in self.data['world_name']:
-            return False
+            return False, "Empty data error"
+        if self.data['run_type'] != 'random_seed':
+            return False, "Set seed detected, will not track"
         return True
 
     def on_created(self, evt):
@@ -72,8 +71,9 @@ class NewRecord(FileSystemEventHandler):
         if self.data is None:
             print("Record file couldnt be read")
             return
-        if not self.ensure_run():
-            print("Run failed validation")
+        validation = self.ensure_run()
+        if not validation[0]:
+            print(validation[1])
             return
 
         # Calculate breaks
