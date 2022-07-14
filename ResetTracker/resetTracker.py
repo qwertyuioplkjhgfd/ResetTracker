@@ -57,7 +57,7 @@ class NewRecord(FileSystemEventHandler):
             return False, "Empty data error"
         if self.data['run_type'] != 'random_seed':
             return False, "Set seed detected, will not track"
-        return True
+        return True, ""
 
     def on_created(self, evt):
         self.this_run = [None] * (len(advChecks) + 2 + len(statsChecks))
