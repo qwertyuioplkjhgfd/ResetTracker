@@ -19,5 +19,5 @@ statsChecks = [
     ("minecraft:custom", "minecraft:deaths"),
     ("minecraft:custom", "minecraft:traded_with_villager"),
     ("minecraft:killed", "minecraft:enderman"),
-    ("minecraft:picked_up", "minecraft:ender_eye"),
+    ("minecraft:used", "minecraft:ender_eye"),
 ]
