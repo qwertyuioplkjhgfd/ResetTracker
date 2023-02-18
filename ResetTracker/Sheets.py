@@ -5,20 +5,10 @@ import csv
 import time
 
 
-def setup():
+def setup(settings):
     global sh
     global gc
-    try:
-        settings_file = open("settings.json")
-    except Exception as e:
-        print(e)
-        print(
-            "Could not find settings.json, make sure you have the file in the same directory as the exe, and named exactly 'settings.json'"
-        )
-        input("")
-
-    settings = json.load(settings_file)
-    settings_file.close()
+    
     try:
         gc = gspread.service_account(filename="credentials.json")
     except Exception as e:
@@ -38,9 +28,6 @@ def setup():
             print("Don't forget to share the google sheet with",
                   creds["client_email"])
             settings["spreadsheet-link"] = input("Link to your Sheet:")
-            settings_file = open("settings.json", "w")
-            json.dump(settings, settings_file)
-            settings_file.close()
             continue
         else:
             break

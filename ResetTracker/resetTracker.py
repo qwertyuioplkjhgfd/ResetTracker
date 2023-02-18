@@ -4,12 +4,15 @@ import math
 import csv
 import glob
 import os
+import twitchcmds
 from datetime import datetime, timedelta
 import threading
+import Sheets
 from Sheets import main, setup
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 from checks import advChecks, statsChecks
+import asyncio
 
 statsCsv = "stats.csv"
 try:
@@ -60,8 +63,14 @@ class NewRecord(FileSystemEventHandler):
         return True, ""
 
     def on_created(self, evt):
+        try:
+            self.process_file(evt.src_path)
+        except Exception as e:
+            print(e)
+        
+    def process_file(self, path):
         self.this_run = [None] * (len(advChecks) + 2 + len(statsChecks))
-        self.path = evt.src_path
+        self.path = path
         with open(self.path, "r") as record_file:
             try:
                 self.data = json.load(record_file)
@@ -101,23 +110,39 @@ class NewRecord(FileSystemEventHandler):
         else:
             lan = math.inf
 
+        self.this_run[0] = ms_to_string(self.data["final_rta"])
+        
+        #increment completion count
+        if self.data["is_completed"] and lan > self.data["final_igt"]:
+            twitchcmds.completion(self.data["final_igt"])
+            
         # Advancements
         has_done_something = False
-        self.this_run[0] = ms_to_string(self.data["final_rta"])
         for idx in range(len(advChecks)):
+            time = None
+            check = advChecks[idx]
             # Prefer to read from timelines
-            if advChecks[idx][0] == "timelines" and self.this_run[idx + 1] is None:
+            if check[0] == "timelines" and self.this_run[idx + 1] is None:
                 for tl in self.data["timelines"]:
-                    if tl["name"] == advChecks[idx][1]:
+                    if tl["name"] == check[1]:
                         if lan > int(tl["rta"]):
                             self.this_run[idx + 1] = ms_to_string(tl["igt"])
+                            time = tl["igt"]
                             has_done_something = True
             # Read other stuff from advancements
-            elif (advChecks[idx][0] in adv and adv[advChecks[idx][0]]["complete"] and self.this_run[idx + 1] is None):
-                if lan > int(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["rta"]):
+            elif (check[0] in adv and adv[check[0]]["complete"] and self.this_run[idx + 1] is None):
+                if lan > int(adv[check[0]]["criteria"][check[1]]["rta"]):
+                    time = adv[check[0]]["criteria"][check[1]]["igt"]
                     self.this_run[idx +
-                                  1] = ms_to_string(adv[advChecks[idx][0]]["criteria"][advChecks[idx][1]]["igt"])
+                                  1] = ms_to_string(time)
                     has_done_something = True
+
+            if time is not None:
+                #hardcode some cases for twitch commands
+                if check[1] == "nether_travel":
+                    twitchcmds.blind(int(time))
+                elif check[1] == "enter_end":
+                    twitchcmds.enter_end(int(time))
 
         # If nothing was done, just count as reset
         if not has_done_something:
@@ -202,6 +227,10 @@ class NewRecord(FileSystemEventHandler):
             writer = csv.writer(outfile)
             for line in reader:
                 writer.writerow(line)
+                
+        # update twitch command
+        asyncio.run(twitchcmds.update_command())
+        
         # Reset all counters/sums
         self.wall_resets = 0
         self.rta_spent = 0
@@ -211,7 +240,7 @@ class NewRecord(FileSystemEventHandler):
 
 if __name__ == "__main__":
     settings_file = open("settings.json", "w")
-    json.dump(settings, settings_file)
+    json.dump(settings, settings_file, indent=2)
     settings_file.close()
 
     while True:
@@ -229,7 +258,7 @@ if __name__ == "__main__":
                 "Path to SpeedrunIGT records folder: "
             )
             settings_file = open("settings.json", "w")
-            json.dump(settings, settings_file)
+            json.dump(settings, settings_file, indent=2)
             settings_file.close()
         else:
             break
@@ -237,12 +266,16 @@ if __name__ == "__main__":
         files = glob.glob(f'{settings["path"]}\\*.json')
         for f in files:
             os.remove(f)
-    setup()
+    setup(settings)
     t = threading.Thread(
         target=main, name="sheets"
     )  # < Note that I did not actually call the function, but instead sent it as a parameter
     t.daemon = True
     t.start()  # < This actually starts the thread execution in the background
+
+    twitchcmds.setup(settings)
+    with open('settings.json', 'w') as settings_file:
+        json.dump(settings, settings_file, indent=2)
 
     print("Tracking...")
     print("Type 'quit' when you are done")
@@ -251,14 +284,58 @@ if __name__ == "__main__":
     try:
         while live:
             try:
-                val = input("")
+                val = input("% ")
             except:
                 val = ""
+            args = val.split(' ')
             if (val == "help") or (val == "?"):
-                print("there is literally one other command and it's quit")
-            if (val == "stop") or (val == "quit"):
+                print('help - print this help message')
+                print("quit - quit")
+                print("reset - resets twitch counters")
+                print('update <counter> <value> - updates specified twitch counter. counter can be "blinds", "sub4", "sub330", "sub3", "ees", "completions", "blindtimes", "eestimes", "completiontimes". for lists (e.g. blindtimes), value should be a space-separated list of times')
+                print('undo - deletes latest entry')
+                print('eval <python code> - evaluates python code')
+            elif (val == "stop") or (val == "quit"):
+                print("Stopping...")
                 live = False
-            time.sleep(1)
+            elif (val == "reset"):
+                print("Resetting counters...")
+                twitchcmds.reset()
+                asyncio.run(twitchcmds.update_command())
+                print("...done")
+            elif args[0] == 'update':
+                if twitchcmds.updatecounter(args[1], args[2:]):
+                    asyncio.run(twitchcmds.update_command())
+                    print("Counter set")
+                else:
+                    print("unknown counter", args[1])
+            elif val == 'undo':
+                with open(statsCsv, "r") as infile:
+                    reader = list(csv.reader(infile))
+                if len(reader) != 0:
+                    print('Deleting latest entry from stats.csv', reader.pop(0))
+                    with open(statsCsv, "w", newline="") as outfile:
+                        writer = csv.writer(outfile)
+                        for line in reader:
+                            writer.writerow(line)
+                else:
+                    if settings['sheets']['enabled']:
+                        print('Deleting latest entry from Google Sheets')
+                        Sheets.dataSheet.delete_rows(2)
+            elif args[0] == 'eval':
+                try:
+                    r = eval(' '.join(args[1:]))
+                    if r is not None:
+                        print(r)
+                except Exception as e:
+                    print(str(type(e))[8:-2] + ":", e)
+            elif val == '':
+                pass
+            else:
+                print("Invalid command. Type 'help' for help")
+            time.sleep(0.05)
     finally:
         newRecordObserver.stop()
         newRecordObserver.join()
+        
+        twitchcmds.stop()
