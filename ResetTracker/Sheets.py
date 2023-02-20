@@ -3,7 +3,7 @@ import json
 import copy
 import csv
 import time
-
+import traceback
 
 def setup(settings):
     global sh
@@ -80,7 +80,8 @@ def main():
                 f = open(statsCsv, "w+")
                 f.close()
             except Exception as e:
-                print(e)
+                print('Error in Sheets thread')
+                traceback.print_exc()
 
         live = True
         print("Finished authorizing, will update sheet every 30 seconds")
@@ -88,5 +89,5 @@ def main():
             push_data()
             time.sleep(30)
     except Exception as e:
-        print(e)
-        input("")
+        print('Error starting Sheets thread')
+        traceback.print_exc()

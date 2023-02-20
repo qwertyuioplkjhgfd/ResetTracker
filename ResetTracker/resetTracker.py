@@ -13,6 +13,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 from checks import advChecks, statsChecks
 import asyncio
+import traceback
 
 statsCsv = "stats.csv"
 try:
@@ -66,7 +67,8 @@ class NewRecord(FileSystemEventHandler):
         try:
             self.process_file(evt.src_path)
         except Exception as e:
-            print(e)
+            print('Error reacing records file')
+            traceback.print_exc()
         
     def process_file(self, path):
         self.this_run = [None] * (len(advChecks) + 2 + len(statsChecks))
@@ -328,7 +330,7 @@ if __name__ == "__main__":
                     if r is not None:
                         print(r)
                 except Exception as e:
-                    print(str(type(e))[8:-2] + ":", e)
+                    traceback.print_exc()
             elif val == '':
                 pass
             else:
