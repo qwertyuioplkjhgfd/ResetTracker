@@ -14,6 +14,7 @@ from watchdog.observers import Observer
 from checks import advChecks, statsChecks
 import asyncio
 import traceback
+import logging
 
 statsCsv = "stats.csv"
 try:
@@ -244,6 +245,8 @@ if __name__ == "__main__":
     settings_file = open("settings.json", "w")
     json.dump(settings, settings_file, indent=2)
     settings_file.close()
+    
+    logging.basicConfig(filename='debug.log', encoding='utf-8', level=logging.DEBUG)
 
     while True:
         try:
