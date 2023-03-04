@@ -134,8 +134,9 @@ class NewRecord(FileSystemEventHandler):
                             has_done_something = True
             # Read other stuff from advancements
             elif (check[0] in adv and adv[check[0]]["complete"] and self.this_run[idx + 1] is None):
-                if lan > int(adv[check[0]]["criteria"][check[1]]["rta"]):
-                    time = adv[check[0]]["criteria"][check[1]]["igt"]
+                criteria = adv[check[0]]["criteria"]
+                if check[1] in criteria and lan > int(criteria[check[1]]["rta"]):
+                    time = criteria["igt"]
                     self.this_run[idx +
                                   1] = ms_to_string(time)
                     has_done_something = True
