@@ -68,8 +68,10 @@ class NewRecord(FileSystemEventHandler):
         try:
             self.process_file(evt.src_path)
         except Exception as e:
-            print('Error reacing records file')
+            print('Error reading records file')
             traceback.print_exc()
+            logging.error('Error reading records file')
+            logging.error(traceback.format_exc())
         
     def process_file(self, path):
         self.this_run = [None] * (len(advChecks) + 2 + len(statsChecks))
@@ -247,7 +249,12 @@ if __name__ == "__main__":
     json.dump(settings, settings_file, indent=2)
     settings_file.close()
     
-    logging.basicConfig(filename='debug.log', encoding='utf-8', level=logging.DEBUG)
+    logging.basicConfig(
+        filename='debug.log', 
+        encoding='utf-8', 
+        level=logging.DEBUG, 
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S')
 
     while True:
         try:

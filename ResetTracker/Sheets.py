@@ -1,3 +1,4 @@
+import logging
 import gspread
 import json
 import copy
@@ -35,7 +36,6 @@ def setup(settings):
 
 def main():
     try:
-
         # Setting up constants and verifying
         dataSheet = sh.worksheet("Raw Data")
         color = (15.0, 15.0, 15.0)
@@ -82,6 +82,8 @@ def main():
             except Exception as e:
                 print('Error in Sheets thread')
                 traceback.print_exc()
+                logging.error('Error in Sheets thread')
+                logging.error(traceback.format_exc())
 
         live = True
         print("Finished authorizing, will update sheet every 30 seconds")
@@ -91,3 +93,5 @@ def main():
     except Exception as e:
         print('Error starting Sheets thread')
         traceback.print_exc()
+        logging.error('Error starting Sheets thread')
+        logging.error(traceback.format_exc())
