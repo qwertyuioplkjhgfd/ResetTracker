@@ -112,7 +112,11 @@ async def update_command():
     global dirty
     if enabled and dirty:
         dirty = False
+        chat.start()
+        await chat.join_room(room)
         await chat.send_message(room, get_update_command())
+        await chat.leave_room(room)
+        chat.stop()
 
 async def send_chat_message(message):
     if enabled:
@@ -190,11 +194,7 @@ async def enable():
 
     global chat, room, enabled
     chat = await Chat(twitch)
-    chat.start()
-
     room = thisuser.login
-    await chat.join_room(room)
-    
     enabled = True
     
     if settings['twitch']['periodic_message'] != "":
@@ -209,5 +209,6 @@ async def periodic_message():
         await send_chat_message(settings['twitch']['periodic_message'])
 
 def stop():
-    if enabled:
-        chat.stop()
+    # if enabled:
+    #     chat.stop()
+    pass
