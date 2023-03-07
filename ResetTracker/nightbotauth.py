@@ -1,8 +1,9 @@
+from enum import Enum
 import aiohttp
 
 from twitchAPI import Twitch
-from twitchAPI.helper import build_url, build_scope, get_uuid, TWITCH_AUTH_BASE_URL, fields_to_enum, first
-from twitchAPI.types import AuthScope, InvalidRefreshTokenException, UnauthorizedException, TwitchAPIException
+from twitchAPI.helper import get_uuid, fields_to_enum, first
+from twitchAPI.types import InvalidRefreshTokenException, UnauthorizedException, TwitchAPIException
 from twitchAPI.chat import Chat
 from typing import Optional, Callable
 import webbrowser
@@ -12,37 +13,104 @@ from threading import Thread
 from time import sleep
 from concurrent.futures._base import CancelledError
 from logging import getLogger, Logger
-
+import traceback
 from typing import List, Union
 
-class ImplicitAuthenticator:
-    """Simple to use client for the Twitch implicit authentication flow.
+import urllib.parse
+
+NIGHTBOT_AUTH_BASE_URL = 'https://api.nightbot.tv/'
+
+def build_url(url: str, params: dict, remove_none: bool = False, split_lists: bool = False, enum_value: bool = True) -> str:
+    """Build a valid url string
+
+    :param url: base URL
+    :param params: dictionary of URL parameter
+    :param remove_none: if set all params that have a None value get removed |default| :code:`False`
+    :param split_lists: if set all params that are a list will be split over multiple url parameter with the same name |default| :code:`False`
+    :param enum_value: if true, automatically get value string from Enum values |default| :code:`True`
+    :return: URL
+    """
+
+    def get_val(val):
+        if not enum_value:
+            return str(val)
+        if isinstance(val, Enum):
+            return str(val.value)
+        return str(val)
+
+    def add_param(res, k, v):
+        if len(res) > 0:
+            res += "&"
+        res += str(k)
+        if v is not None:
+            res += "=" + urllib.parse.quote(get_val(v))
+        return res
+
+    result = ""
+    for key, value in params.items():
+        if value is None and remove_none:
+            continue
+        if split_lists and isinstance(value, list):
+            for va in value:
+                result = add_param(result, key, va)
+        else:
+            result = add_param(result, key, value)
+    return url + (("?" + result) if len(result) > 0 else "")
+
+def build_scope(scopes):
+    return ' '.join([s.value for s in scopes])
+
+
+class Nightbot:
+    def __init__(self, client_id):
+        self.client_id = client_id
+        
+    def set_user_authentication(self, user_token, scopes):
+        self.user_token = user_token
+        self.scopes = scopes
+    
+    def edit_command(self, name, content):
+        pass
+
+
+class AuthScope(Enum):
+    CHANNEL = 'channel'
+    CHANNEL_SEND = 'channel_send'
+    COMMANDS = 'commands'
+    COMMANDS_DEFAULT = 'commands_default'
+    REGULARS = 'regulars'
+    SONG_REQUESTS = 'song_requests'
+    SONG_REQUESTS_QUEUE = 'song_requests_queue'
+    SONG_REQUESTS_PLAYLIST = 'song_requests_playlist'
+    SPAM_PROTECTION = 'spam_protection'
+    SUBSCRIBERS = 'subscribers'
+    TIMERS = 'timers'
+
+
+class NightbotImplAuthenticator:
+    """Simple to use client for the Nightbot implicit authentication flow.
        """
 
     def __init__(self,
-                 twitch: 'Twitch',
+                 nightbot: 'Nightbot',
                  scopes: List[AuthScope],
-                 force_verify: bool = False,
                  url: str = 'http://localhost:17563'):
         """
-
-        :param twitch: A twitch instance
+        :param nightbot: A nightbot instance
         :param scopes: List of the desired Auth scopes
-        :param force_verify: If this is true, the user will always be prompted for authorization by twitch |default| :code:`False`
         :param url: The reachable URL that will be opened in the browser. |default| :code:`http://localhost:17563`
         """
-        self.__twitch: 'Twitch' = twitch
-        self.__client_id: str = twitch.app_id
+        self.__nightbot: 'Nightbot' = nightbot
+        self.__client_id: str = nightbot.client_id
         self.scopes: List[AuthScope] = scopes
-        self.force_verify: bool = force_verify
-        self.logger: Logger = getLogger('twitchAPI.oauth')
+        self.logger: Logger = getLogger('nightbotauth.oauth')
         """The logger used for OAuth related log messages"""
         self.url = url
         self.redirect_document: str = """<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <title>pyTwitchAPI OAuth</title>
+            <title>Nightbot OAuth</title>
         </head>
         <body>
             <h1>Redirecting you...</h1>
@@ -55,12 +123,14 @@ class ImplicitAuthenticator:
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <title>pyTwitchAPI OAuth</title>
+            <title>Nightbot OAuth</title>
         </head>
         <body>
-            <h1>Thanks for Authenticating with pyTwitchAPI!</h1>
-        This page closes itself after 5 seconds.
+            <h1>Thanks for Authenticating with Nightbot!</h1>
+            You may now close this page.
             <script>
+            //dude i spent like an hour trying to figure out why this doesn't work but twitch's works
+            //still have zero idea
             setTimeout(function() {
                 window.close();
                 }, 5000);
@@ -69,7 +139,7 @@ class ImplicitAuthenticator:
         </html>"""
         """The document that will be rendered at the end of the flow"""
         self.port: int = 17563
-        """The port that will be used. |default| :code:`17653`"""
+        """The port that will be used. |default| :code:`17654`"""
         self.host: str = '0.0.0.0'
         """the host the webserver will bind to. |default| :code:`0.0.0.0`"""
         self.state: str = str(get_uuid())
@@ -84,14 +154,13 @@ class ImplicitAuthenticator:
 
     def __build_auth_url(self):
         params = {
-            'client_id': self.__twitch.app_id,
+            'client_id': self.__nightbot.client_id,
             'redirect_uri': self.url,
             'response_type': 'token',
             'scope': build_scope(self.scopes),
-            'force_verify': str(self.force_verify).lower(),
             'state': self.state
         }
-        return build_url(TWITCH_AUTH_BASE_URL + 'oauth2/authorize', params)
+        return build_url(NIGHTBOT_AUTH_BASE_URL + 'oauth2/authorize', params)
 
     def __build_runner(self):
         app = web.Application()
@@ -132,6 +201,11 @@ class ImplicitAuthenticator:
         self.__can_close = True
 
     async def __handle_callback(self, request: web.Request):
+        error = request.rel_url.query.get('error')
+        if error is not None:
+            print(f'Error authenticating with nightbot: {error}')
+            return web.Response(status=401)
+        
         val = request.rel_url.query.get('state')
         if val is None:
             return web.Response(text=self.redirect_document, content_type='text/html')
@@ -199,32 +273,31 @@ class ImplicitAuthenticator:
         self.stop()
         while not self.__is_closed:
             await asyncio.sleep(0.1)
-        return self.__user_token #lol
+        return self.__user_token 
 
 
-async def twitch_example():
+async def nightbot_example():
     # initialize the twitch instance, this will by default also create a app authentication for you
-    twitch = await Twitch('cy0wkkzf69rj7gsvypb6tjxdvdoif3', authenticate_app=False)
-    twitch.auto_refresh_auth = False
+    nbot = Nightbot('3df83e4d6c9bfafc5c25f3f6669fe59f')
 
-    scope = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT]
+    scopes = [AuthScope.CHANNEL_SEND, AuthScope.COMMANDS]
     
-    auth = ImplicitAuthenticator(twitch, scope, force_verify=False)
+    auth = NightbotImplAuthenticator(nbot, scopes)
     token = await auth.authenticate()
-    await twitch.set_user_authentication(token, scope)
+    await nbot.set_user_authentication(token, scopes)
 
-    thisuser = await first(twitch.get_users())
+    # thisuser = await first(twitch.get_users())
 
-    chat = await Chat(twitch)
-    chat.start()
+    # chat = await Chat(twitch)
+    # chat.start()
 
-    room = thisuser.login
-    await chat.join_room(room)
-    await chat.send_message(room, "!commands")
+    # room = thisuser.login
+    # await chat.join_room(room)
+    # await chat.send_message(room, "!commands")
 
-    chat.stop()
+    # chat.stop()
 
 if __name__ == "__main__":
     # run this example
-    asyncio.run(twitch_example())
+    asyncio.run(nightbot_example())
 
