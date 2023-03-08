@@ -65,11 +65,12 @@ class Nightbot:
     def __init__(self, client_id):
         self.client_id = client_id
         
-    def set_user_authentication(self, user_token, scopes):
+    async def set_user_authentication(self, user_token, scopes):
         self.user_token = user_token
         self.scopes = scopes
     
-    def edit_command(self, name, content):
+    async def edit_command(self, name, content):
+        # todo
         pass
 
 
@@ -285,6 +286,8 @@ async def nightbot_example():
     auth = NightbotImplAuthenticator(nbot, scopes)
     token = await auth.authenticate()
     await nbot.set_user_authentication(token, scopes)
+    
+    await nbot.edit_command("!today", "this is a nightbot test")
 
     # thisuser = await first(twitch.get_users())
 
