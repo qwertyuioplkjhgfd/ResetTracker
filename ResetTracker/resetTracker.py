@@ -343,6 +343,14 @@ async def trackermain():
                         print(r)
                 except Exception as e:
                     traceback.print_exc()
+            elif args[0] == 'await':
+                try:
+                    r = eval(' '.join(args[1:]))
+                    r = await r
+                    if r is not None:
+                        print(r)
+                except Exception as e:
+                    traceback.print_exc()
             elif val == '':
                 pass
             else:

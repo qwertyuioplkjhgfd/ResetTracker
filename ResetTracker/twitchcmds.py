@@ -120,7 +120,11 @@ async def update_command():
 
 async def send_chat_message(message):
     if enabled:
+        chat.start()
+        await chat.join_room(room)
         await chat.send_message(room, message)
+        await chat.leave_room(room)
+        chat.stop()
 
 def get_update_command():
     command = settings['twitch']['command']
