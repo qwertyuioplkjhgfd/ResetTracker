@@ -7,7 +7,7 @@ from twitchAPI.types import InvalidRefreshTokenException, UnauthorizedException,
 from twitchAPI.chat import Chat
 from typing import Optional, Callable
 import webbrowser
-from aiohttp import web
+from aiohttp import ClientSession, web
 import asyncio
 from threading import Thread
 from time import sleep
@@ -19,6 +19,7 @@ from typing import List, Union
 import urllib.parse
 
 NIGHTBOT_AUTH_BASE_URL = 'https://api.nightbot.tv/'
+NIGHTBOT_API_BASE_URL = 'https://api.nightbot.tv/'
 
 def build_url(url: str, params: dict, remove_none: bool = False, split_lists: bool = False, enum_value: bool = True) -> str:
     """Build a valid url string
@@ -64,14 +65,42 @@ def build_scope(scopes):
 class Nightbot:
     def __init__(self, client_id):
         self.client_id = client_id
+        self.user_token = None
+        self.scopes = None
+        self._commands = None
+        self._session = ClientSession(base_url=NIGHTBOT_API_BASE_URL)
         
     async def set_user_authentication(self, user_token, scopes):
         self.user_token = user_token
         self.scopes = scopes
+        self._session.headers.update({'Authorization': 'Bearer ' + self.user_token})
     
     async def edit_command(self, name, content):
-        # todo
-        pass
+        await self._load_commands()
+        
+        for command in self._commands["commands"]:
+            if command["name"] == name:
+                async with self._session.put('/1/commands/'+command["_id"], data={"message":content}) as response:
+                    if response.status != 200:
+                        print('Error editing nightbot command: ', await response.json())
+                    return
+        
+        print('warning: could not find command ' + name + ', please add it to nightbot')
+        # invalidate current cache
+        self._commands = None
+    
+    async def _load_commands(self):
+        """
+        loads nightbot commands into self.commands if not already
+        """
+        if self._commands is None:
+            async with self._session.get('/1/commands') as response:
+                if response.status != 200:
+                    print('Error fetching nightbot commands: ', await response.json())
+                self._commands = await response.json()
+    
+    async def stop(self):
+        await self._session.close()
 
 
 class AuthScope(Enum):
@@ -287,18 +316,9 @@ async def nightbot_example():
     token = await auth.authenticate()
     await nbot.set_user_authentication(token, scopes)
     
-    await nbot.edit_command("!today", "this is a nightbot test")
-
-    # thisuser = await first(twitch.get_users())
-
-    # chat = await Chat(twitch)
-    # chat.start()
-
-    # room = thisuser.login
-    # await chat.join_room(room)
-    # await chat.send_message(room, "!commands")
-
-    # chat.stop()
+    await nbot.edit_command("!today", "this is a nightbot test 1")
+    
+    await nbot.stop()
 
 if __name__ == "__main__":
     # run this example
