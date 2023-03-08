@@ -112,7 +112,19 @@ async def update_command():
     global dirty
     if enabled and dirty:
         dirty = False
+        chat.start()
+        await chat.join_room(room)
         await chat.send_message(room, get_update_command())
+        await chat.leave_room(room)
+        chat.stop()
+
+async def send_chat_message(message):
+    if enabled:
+        chat.start()
+        await chat.join_room(room)
+        await chat.send_message(room, message)
+        await chat.leave_room(room)
+        chat.stop()
 
 def get_update_command():
     command = settings['twitch']['command']
@@ -136,7 +148,7 @@ def tostring(list):
         return ""
     return f"[{', '.join(list)}]"
 
-def setup(initialsettings):
+async def setup(initialsettings):
     global settings
     settings = initialsettings
     if 'twitch' not in settings:
@@ -159,7 +171,13 @@ def setup(initialsettings):
     if 'command' not in twitchsettings:
         twitchsettings['command'] = input('What twitch command should be updated? (leave blank for "!today") ') or "!today"
         
-    asyncio.run(enable())
+    if 'periodic_message' not in twitchsettings:
+        twitchsettings['periodic_message'] = ""
+    
+    if 'periodic_message_interval' not in twitchsettings:
+        twitchsettings['periodic_message_interval'] = 30 * 60
+    
+    await enable()
 
 
 async def enable():
@@ -180,13 +198,21 @@ async def enable():
 
     global chat, room, enabled
     chat = await Chat(twitch)
-    chat.start()
-
     room = thisuser.login
-    await chat.join_room(room)
-
     enabled = True
+    
+    if settings['twitch']['periodic_message'] != "":
+        # keep task alive
+        global task
+        task = asyncio.create_task(periodic_message())
+    
+
+async def periodic_message():
+    while enabled:
+        await asyncio.sleep(settings['twitch']['periodic_message_interval'])
+        await send_chat_message(settings['twitch']['periodic_message'])
 
 def stop():
-    if enabled:
-        chat.stop()
+    # if enabled:
+    #     chat.stop()
+    pass

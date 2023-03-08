@@ -138,7 +138,7 @@ class NewRecord(FileSystemEventHandler):
             elif (check[0] in adv and adv[check[0]]["complete"] and self.this_run[idx + 1] is None):
                 criteria = adv[check[0]]["criteria"]
                 if check[1] in criteria and lan > int(criteria[check[1]]["rta"]):
-                    time = criteria["igt"]
+                    time = criteria[check[1]]["igt"]
                     self.this_run[idx +
                                   1] = ms_to_string(time)
                     has_done_something = True
@@ -242,9 +242,9 @@ class NewRecord(FileSystemEventHandler):
         self.rta_spent = 0
         self.splitless_count = 0
         self.break_rta = 0
-
-
-if __name__ == "__main__":
+        
+    
+async def trackermain():
     settings_file = open("settings.json", "w")
     json.dump(settings, settings_file, indent=2)
     settings_file.close()
@@ -286,7 +286,7 @@ if __name__ == "__main__":
     t.daemon = True
     t.start()  # < This actually starts the thread execution in the background
 
-    twitchcmds.setup(settings)
+    await twitchcmds.setup(settings)
     with open('settings.json', 'w') as settings_file:
         json.dump(settings, settings_file, indent=2)
 
@@ -297,7 +297,8 @@ if __name__ == "__main__":
     try:
         while live:
             try:
-                val = input("% ")
+                loop = asyncio.get_event_loop()
+                val = await loop.run_in_executor(None, input, "% ")
             except:
                 val = ""
             args = val.split(' ')
@@ -314,11 +315,11 @@ if __name__ == "__main__":
             elif (val == "reset"):
                 print("Resetting counters...")
                 twitchcmds.reset()
-                asyncio.run(twitchcmds.update_command())
+                await twitchcmds.update_command()
                 print("...done")
             elif args[0] == 'update':
                 if twitchcmds.updatecounter(args[1], args[2:]):
-                    asyncio.run(twitchcmds.update_command())
+                    await twitchcmds.update_command()
                     print("Counter set")
                 else:
                     print("unknown counter", args[1])
@@ -342,13 +343,24 @@ if __name__ == "__main__":
                         print(r)
                 except Exception as e:
                     traceback.print_exc()
+            elif args[0] == 'await':
+                try:
+                    r = eval(' '.join(args[1:]))
+                    r = await r
+                    if r is not None:
+                        print(r)
+                except Exception as e:
+                    traceback.print_exc()
             elif val == '':
                 pass
             else:
                 print("Invalid command. Type 'help' for help")
-            time.sleep(0.05)
+            await asyncio.sleep(0.05)
     finally:
         newRecordObserver.stop()
         newRecordObserver.join()
         
         twitchcmds.stop()
+
+if __name__ == "__main__":
+    asyncio.run(trackermain())
