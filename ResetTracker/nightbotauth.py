@@ -96,7 +96,7 @@ class Nightbot:
                     self._commands = await response.json()
     
     async def stop(self):
-        await self._session.close()
+        pass
 
 
 class AuthScope(Enum):
