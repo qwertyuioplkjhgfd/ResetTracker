@@ -262,7 +262,7 @@ def get_command_updater():
     elif method in ('none', ''):
         return commandupdater.CommandUpdater(settings)
     else:
-        print(f'Invalid method {method} for twitch command updating. Defaulting to chat.')
+        print(f'Invalid method {method} for twitch command updating. Defaulting to none.')
         return commandupdater.CommandUpdater(settings)
         
     
