@@ -86,7 +86,6 @@ def main():
                 logging.error(traceback.format_exc())
 
         live = True
-        print("Finished authorizing, will update sheet every 30 seconds")
         while live:
             push_data()
             time.sleep(30)

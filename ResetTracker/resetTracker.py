@@ -4,7 +4,9 @@ import math
 import csv
 import glob
 import os
+import nightbotcmds
 import twitchcmds
+import commandupdater
 from datetime import datetime, timedelta
 import threading
 import Sheets
@@ -27,6 +29,7 @@ except Exception as e:
         "Could not find settings.json, make sure you have the file in the same directory as the exe, and named exactly 'settings.json'"
     )
     wait = input("")
+command_updater = None
 
 
 def ms_to_string(ms, returnTime=False):
@@ -119,7 +122,7 @@ class NewRecord(FileSystemEventHandler):
         
         #increment completion count
         if self.data["is_completed"] and lan > self.data["final_igt"]:
-            twitchcmds.completion(self.data["final_igt"])
+            command_updater.completion(self.data["final_igt"])
             
         # Advancements
         has_done_something = False
@@ -146,9 +149,9 @@ class NewRecord(FileSystemEventHandler):
             if time is not None:
                 #hardcode some cases for twitch commands
                 if check[1] == "nether_travel":
-                    twitchcmds.blind(int(time))
+                    command_updater.blind(int(time))
                 elif check[1] == "enter_end":
-                    twitchcmds.enter_end(int(time))
+                    command_updater.enter_end(int(time))
 
         # If nothing was done, just count as reset
         if not has_done_something:
@@ -235,13 +238,32 @@ class NewRecord(FileSystemEventHandler):
                 writer.writerow(line)
                 
         # update twitch command
-        asyncio.run(twitchcmds.update_command())
+        asyncio.run(command_updater.update_command())
         
         # Reset all counters/sums
         self.wall_resets = 0
         self.rta_spent = 0
         self.splitless_count = 0
         self.break_rta = 0
+        
+def get_command_updater():
+    # check if method is 'chat' or 'nightbot'
+    # if not, check if enabled, and default to chat
+    if 'method' not in settings['twitch']:
+        if 'enabled' in settings['twitch']:
+            settings['twitch']['method'] = 'chat' if settings['twitch']['enabled'] else 'none'
+        else:
+            settings['twitch']['method'] = input('What method would you like to use for updating twitch commands? (chat/nightbot/none) ') or 'none'
+    method = settings['twitch']['method']
+    if method == 'nightbot':
+        return nightbotcmds.NightbotCommandUpdater(settings)
+    elif method == 'chat':
+        return twitchcmds.TwitchCommandUpdater(settings)
+    elif method in ('none', ''):
+        return commandupdater.CommandUpdater(settings)
+    else:
+        print(f'Invalid method {method} for twitch command updating. Defaulting to chat.')
+        return commandupdater.CommandUpdater(settings)
         
     
 async def trackermain():
@@ -284,12 +306,14 @@ async def trackermain():
         target=main, name="sheets"
     )  # < Note that I did not actually call the function, but instead sent it as a parameter
     t.daemon = True
-    t.start()  # < This actually starts the thread execution in the background
 
-    await twitchcmds.setup(settings)
+    global command_updater
+    command_updater = get_command_updater()
+    await command_updater.setup()
     with open('settings.json', 'w') as settings_file:
         json.dump(settings, settings_file, indent=2)
 
+    t.start()  # < This actually starts the thread execution in the background
     print("Tracking...")
     print("Type 'quit' when you are done")
     live = True
@@ -314,12 +338,14 @@ async def trackermain():
                 live = False
             elif (val == "reset"):
                 print("Resetting counters...")
-                twitchcmds.reset()
-                await twitchcmds.update_command()
+                command_updater.reset()
+                await command_updater.update_command()
                 print("...done")
             elif args[0] == 'update':
-                if twitchcmds.updatecounter(args[1], args[2:]):
-                    await twitchcmds.update_command()
+                if len(args) < 3:
+                    print('update <counter> <value> - updates specified twitch counter. counter can be "blinds", "sub4", "sub330", "sub3", "ees", "completions", "blindtimes", "eestimes", "completiontimes". for lists (e.g. blindtimes), value should be a space-separated list of times')
+                elif command_updater.updatecounter(args[1], args[2:]):
+                    await command_updater.update_command()
                     print("Counter set")
                 else:
                     print("unknown counter", args[1])
@@ -360,7 +386,7 @@ async def trackermain():
         newRecordObserver.stop()
         newRecordObserver.join()
         
-        twitchcmds.stop()
+        await command_updater.stop()
 
 if __name__ == "__main__":
     asyncio.run(trackermain())
