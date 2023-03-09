@@ -64,22 +64,21 @@ class Nightbot:
         self.user_token = None
         self.scopes = None
         self._commands = None
-        self._session = ClientSession(base_url=NIGHTBOT_API_BASE_URL)
         
     async def set_user_authentication(self, user_token, scopes):
         self.user_token = user_token
         self.scopes = scopes
-        self._session.headers.update({'Authorization': 'Bearer ' + self.user_token})
     
     async def edit_command(self, name, content):
         await self._load_commands()
         
         for command in self._commands["commands"]:
             if command["name"] == name:
-                async with self._session.put('/1/commands/'+command["_id"], data={"message":content}) as response:
-                    if response.status != 200:
-                        print('Error editing nightbot command: ', await response.json())
-                    return
+                async with ClientSession(base_url=NIGHTBOT_API_BASE_URL, headers={'Authorization': 'Bearer ' + self.user_token}) as session:
+                    async with session.put('/1/commands/'+command["_id"], data={"message":content}) as response:
+                        if response.status != 200:
+                            print('Error editing nightbot command: ', await response.json())
+                        return
         
         print('warning: could not find command ' + name + ', please add it to nightbot')
         # invalidate current cache
@@ -90,10 +89,11 @@ class Nightbot:
         loads nightbot commands into self.commands if not already
         """
         if self._commands is None:
-            async with self._session.get('/1/commands') as response:
-                if response.status != 200:
-                    print('Error fetching nightbot commands: ', await response.json())
-                self._commands = await response.json()
+            async with ClientSession(base_url=NIGHTBOT_API_BASE_URL, headers={'Authorization': 'Bearer ' + self.user_token}) as session:
+                async with session.get('/1/commands') as response:
+                    if response.status != 200:
+                        print('Error fetching nightbot commands: ', await response.json())
+                    self._commands = await response.json()
     
     async def stop(self):
         await self._session.close()
