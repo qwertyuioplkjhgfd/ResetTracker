@@ -36,7 +36,11 @@ class TwitchCommandUpdater(CommandUpdater):
 
         scope = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT]
         auth = ImplicitAuthenticator(self.twitch, scope, force_verify=False)
-        token = await auth.authenticate()
+        try:
+            token = await auth.authenticate()
+        except TwitchAPIException as e:
+            print('Error authenticating with Twitch: {}'.format(e))
+            return
         await self.twitch.set_user_authentication(token, scope)
 
         thisuser = await first(self.twitch.get_users())

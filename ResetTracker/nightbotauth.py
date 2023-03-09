@@ -1,10 +1,6 @@
 from enum import Enum
+import uuid
 import aiohttp
-
-from twitchAPI import Twitch
-from twitchAPI.helper import get_uuid, fields_to_enum, first
-from twitchAPI.types import InvalidRefreshTokenException, UnauthorizedException, TwitchAPIException
-from twitchAPI.chat import Chat
 from typing import Optional, Callable
 import webbrowser
 from aiohttp import ClientSession, web
@@ -172,7 +168,7 @@ class NightbotImplAuthenticator:
         """The port that will be used. |default| :code:`17654`"""
         self.host: str = '0.0.0.0'
         """the host the webserver will bind to. |default| :code:`0.0.0.0`"""
-        self.state: str = str(get_uuid())
+        self.state: str = str(uuid.uuid4())
         self.__callback_func = None
         self.__server_running: bool = False
         self.__loop: Union[asyncio.AbstractEventLoop, None] = None
@@ -258,24 +254,19 @@ class NightbotImplAuthenticator:
 
     async def authenticate(self,
                            callback_func: Optional[Callable[[str, str], None]] = None,
-                           user_token: Optional[str] = None,
                            browser_name: Optional[str] = None,
                            browser_new: int = 2):
         """Start the user authentication flow\n
         If callback_func is not set, authenticate will wait till the authentication process finished and then return
-        the access_token and the refresh_token
-        If user_token is set, it will be used instead of launching the webserver and opening the browser
+        the access_token
 
         :param callback_func: Function to call once the authentication finished.
-        :param user_token: Code obtained from twitch to request the access and refresh token.
         :param browser_name: The browser that should be used, None means that the system default is used.
                             See `the webbrowser documentation <https://docs.python.org/3/library/webbrowser.html#webbrowser.register>`__ for more info
                             |default|:code:`None`
         :param browser_new: controls in which way the link will be opened in the browser.
                             See `the webbrowser documentation <https://docs.python.org/3/library/webbrowser.html#webbrowser.open>`__ for more info
                             |default|:code:`2`
-        :return: None if callback_func is set, otherwise access_token
-        :raises ~twitchAPI.types.TwitchAPIException: if authentication fails
         :rtype: None or (str, str)
         """
         self.__callback_func = callback_func
@@ -283,23 +274,18 @@ class NightbotImplAuthenticator:
         self.__user_token = None
         self.__is_closed = False
 
-        if user_token is None:
-            self.__start()
-            # wait for the server to start up
-            while not self.__server_running:
-                sleep(0.01)
-            # open in browser
-            browser = webbrowser.get(browser_name)
-            toopenurl = self.__build_auth_url()
-            print("opening url " + toopenurl)
-            browser.open(toopenurl, new=browser_new)
-            
-            while self.__user_token is None:
-                sleep(0.01)
-            # now we need to actually get the correct token
-        else:
-            self.__user_token = user_token
-            self.__is_closed = True
+        self.__start()
+        # wait for the server to start up
+        while not self.__server_running:
+            sleep(0.01)
+        # open in browser
+        browser = webbrowser.get(browser_name)
+        toopenurl = self.__build_auth_url()
+        print("opening url " + toopenurl)
+        browser.open(toopenurl, new=browser_new)
+        
+        while self.__user_token is None:
+            sleep(0.01)
         self.stop()
         while not self.__is_closed:
             await asyncio.sleep(0.1)
@@ -307,7 +293,6 @@ class NightbotImplAuthenticator:
 
 
 async def nightbot_example():
-    # initialize the twitch instance, this will by default also create a app authentication for you
     nbot = Nightbot('3df83e4d6c9bfafc5c25f3f6669fe59f')
 
     scopes = [AuthScope.CHANNEL_SEND, AuthScope.COMMANDS]
